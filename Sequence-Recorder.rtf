@@ -1,0 +1,636 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1343\cocoasubrtf160
+{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;}
+{\colortbl;\red255\green255\blue255;\red0\green116\blue0;\red100\green56\blue32;\red196\green26\blue22;
+\red28\green0\blue207;\red170\green13\blue145;\red92\green38\blue153;\red38\green71\blue75;\red46\green13\blue110;
+\red63\green110\blue116;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww20840\viewh8400\viewkind0
+\deftab626
+\pard\tx626\pardeftab626\pardirnatural
+
+\f0\fs26 \cf2 \CocoaLigature0 /*\
+ ##########################################################################################################################\
+ #################################### M I D I - S E Q U E N C E  R E C O R D E R ##########################################\
+ ##########################################################################################################################\
+ */\cf0 \
+\
+\cf3 #include \cf4 <math.h>\cf3 \
+#include \cf4 <stdio.h>\cf3 \
+#include \cf4 <stdlib.h>\cf3 \
+#include \cf4 <string.h>\cf3 \
+#include \cf4 "aservelibs/aservelib.h"\cf3 \
+\cf0 \
+\cf2 //DEFINES\cf0 \
+\cf3 #define FLUSH while(getchar() != \cf5 '\\n'\cf3 )\
+#define TRANSPconst \cf5 12.7\cf3 \
+#define velocityDivisor \cf5 127.0\cf3 \
+\cf0 \
+\cf2 //STRUCTURES\cf0 \
+\cf6 typedef\cf0  \cf6 struct\cf0 \
+\{\
+    \cf6 int\cf0  note;\
+    \cf6 int\cf0  velocity;\
+    \cf6 int\cf0  wave;\
+\}noteData;\
+\
+\cf2 //GLOBAL VARIABLES\cf0 \
+\cf6 int\cf0  seqCount;\
+\cf6 bool\cf0  callBackEnabled;\
+\
+\
+\cf2 //ARRAYS\cf0 \
+\cf6 char\cf0  sequenceFileName[\cf5 30\cf0 ];\
+\cf6 int\cf0  ampLayer1 [\cf5 8\cf0 ];\
+\cf6 int\cf0  ampLayer2 [\cf5 8\cf0 ];\
+\
+\cf2 //FILES\cf0 \
+\pard\tx626\pardeftab626\pardirnatural
+\cf7 FILE\cf0  *sequenceFile;\
+\
+\
+\pard\tx626\pardeftab626\pardirnatural
+\cf2 //=====================================================================================================================\cf0 \
+\cf2 //============================= F U N C T I O N   D E C L A R A T I O N S =============================================\cf0 \
+\cf2 //=====================================================================================================================\cf0 \
+\cf6 int\cf0  getStartChoice();\
+\cf6 int\cf0  getMainChoice();\
+\cf6 int\cf0  getPauseChoice();\
+\cf6 void\cf0  createNewFile();\
+\cf6 int\cf0  loadFile();\
+\cf6 void\cf0  record();\
+\cf6 void\cf0  playback();\
+\cf6 float\cf0  mtof(\cf6 float\cf0  note);\
+\cf6 void\cf0  stopOscillator();\
+\cf6 void\cf0  midiCallBack(\cf6 int\cf0  status, \cf6 int\cf0  data1, \cf6 int\cf0  data2);\
+\cf6 void\cf0  printInstructions();\
+\cf6 void\cf0  getVolumeControl();\
+\
+\
+\cf2 //=====================================================================================================================\cf0 \
+\cf2 //======================================= M A I N   F U N C T I O N ===================================================\cf0 \
+\cf2 //=====================================================================================================================\cf0 \
+\cf6 int\cf0  main()\
+\{\
+    \cf2 //LOCAL VARIABLES\cf0 \
+    \cf6 int\cf0  startChoice = \cf5 0\cf0 ;\
+    \cf6 char\cf0  mainChoice = \cf5 '0'\cf0 ;\
+    \cf6 char\cf0  pauseChoice = \cf5 '0'\cf0 ;\
+    \cf6 int\cf0  loadCheck = \cf5 0\cf0 ;\
+    \
+    \cf2 //REGISTER midiCallbck\cf0 \
+    \cf8 aserveSetMidiCallback\cf0 (\cf8 midiCallBack\cf0 );\
+    \
+    \cf2 //ENTER MENU\cf0 \
+    \cf6 while\cf0 (startChoice !=\cf5 9\cf0 )\
+    \{\
+        startChoice = \cf8 getStartChoice\cf0 ();\
+        \
+        \cf6 while\cf0 (mainChoice != \cf5 '9'\cf0  && startChoice != \cf5 9\cf0 )\
+        \{\
+            mainChoice = \cf8 getMainChoice\cf0 ();\
+            \
+            \cf6 switch\cf0  (mainChoice)\
+            \{\
+                \cf6 case\cf0  \cf5 '1'\cf0 :\
+                    \cf8 createNewFile\cf0 ();\
+                    \cf6 break\cf0 ;\
+                    \
+                \cf6 case\cf0  \cf5 '2'\cf0 :\
+                    loadCheck = \cf8 loadFile\cf0 ();\
+                    \cf6 break\cf0 ;\
+                    \
+                \cf6 default\cf0 :\
+                    \cf6 break\cf0 ;\
+            \}\
+            \
+            \cf6 if\cf0 (mainChoice != \cf5 '9'\cf0  && loadCheck != \cf5 1\cf0 )\
+            \{\
+                \cf6 while\cf0 (pauseChoice != \cf5 '9'\cf0  && pauseChoice != \cf5 9\cf0 )\
+                \{\
+                    pauseChoice = \cf8 getPauseChoice\cf0 ();\
+                    \
+                    \cf6 switch\cf0  (pauseChoice)\
+                    \{\
+                        \cf6 case\cf0  \cf5 '1'\cf0 :\
+                            \cf8 record\cf0 ();\
+                            \cf6 break\cf0 ;\
+                            \
+                        \cf6 case\cf0  \cf5 '2'\cf0 :\
+                            \cf8 playback\cf0 ();\
+                            \cf6 break\cf0 ;\
+                            \
+                        \cf6 default\cf0 :\
+                            \cf6 break\cf0 ;\
+                    \}\
+                \}\
+                \
+                pauseChoice = \cf5 '0'\cf0 ;\
+            \}\
+        \}\
+        \
+        mainChoice = \cf5 '0'\cf0 ;\
+    \}\
+    \
+    \cf6 return\cf0  \cf5 0\cf0 ;\
+\}\
+\
+\cf2 //=====================================================================================================================\cf0 \
+\cf2 //======================================== F U N C T I O N   D E F I N I T I O N S ====================================\cf0 \
+\cf2 //=====================================================================================================================\cf0 \
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //+++++++++++++++++++++++++++++++ g e t S t a r t C h o i c e ++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 int\cf0  getStartChoice()\
+\{\
+    \cf2 //local variable\cf0 \
+    \cf6 int\cf0  startChoice;\
+    \
+    \cf6 do\cf0 \
+    \{\
+        \cf9 printf\cf0 (\cf4 "\\n===================================="\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t\\t\\tWELCOME"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t\\t Press 1 to START"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t\\t Press 9 to EXIT"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+        \cf9 scanf\cf0 (\cf4 "%d"\cf0 , &startChoice);\
+        \cf3 FLUSH\cf0 ;\
+        \cf6 if\cf0  (startChoice != \cf5 1\cf0  && startChoice != \cf5 9\cf0 )\
+            \cf9 printf\cf0 (\cf4 "\\n!!!INPUT INVALID!!!\\n"\cf0 );\
+        \
+    \}\cf6 while\cf0 (startChoice != \cf5 1\cf0  && startChoice != \cf5 9\cf0 );\
+    \
+    \cf6 return\cf0  startChoice;\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++ g e t M a i n C h o i c e +++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 int\cf0  getMainChoice()\
+\{\
+    \cf2 //local variable\cf0 \
+    \cf6 char\cf0  mainChoice;\
+    \
+    \cf6 do\cf0 \
+    \{\
+        \cf9 printf\cf0 (\cf4 "\\n===================================="\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t\\t\\tMAIN MENU"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t Press 1 to create a New file"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t Press 2 to LOAD a file"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t Press 9 to go BACK"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+        \cf9 scanf\cf0 (\cf4 "%c"\cf0 , &mainChoice);\
+        \cf3 FLUSH\cf0 ;\
+        \cf6 if\cf0  (mainChoice != \cf5 '1'\cf0  && mainChoice != \cf5 '2'\cf0  && mainChoice != \cf5 '9'\cf0 )\
+            \cf9 printf\cf0 (\cf4 "\\n!!!INPUT INVALID!!!\\n"\cf0 );\
+        \
+    \}\cf6 while\cf0  (mainChoice != \cf5 '1'\cf0  && mainChoice != \cf5 '2'\cf0  && mainChoice != \cf5 '9'\cf0 );\
+    \
+    \cf6 return\cf0  mainChoice;\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //+++++++++++++++++++++++++ g e t P a u s e C o i c e ++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 int\cf0  getPauseChoice()\
+\{\
+    \cf2 //local variable\cf0 \
+    \cf6 char\cf0  pauseChoice;\
+    \
+    \cf6 do\cf0 \
+    \{\
+        \cf9 printf\cf0 (\cf4 "\\n===================================="\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t\\t\\tPAUSE MENU"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t Press 1 to record a sequence"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t Press 2 for playback"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n\\t Press 9 to go BACK"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+        \cf9 scanf\cf0 (\cf4 "%c"\cf0 , &pauseChoice);\
+        \cf3 FLUSH\cf0 ;\
+        \
+        \cf6 if\cf0  (pauseChoice != \cf5 '1'\cf0  && pauseChoice != \cf5 '2'\cf0  && pauseChoice != \cf5 '9'\cf0 )\
+            \cf9 printf\cf0 (\cf4 "\\n!!!INPUT INVALID!!!\\n"\cf0 );\
+        \
+    \}\cf6 while\cf0  (pauseChoice != \cf5 '1'\cf0  && pauseChoice != \cf5 '2'\cf0  && pauseChoice != \cf5 '9'\cf0 );\
+    \
+    \cf6 return\cf0  pauseChoice;\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++ c r e a t e N e w F i l e +++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 void\cf0  createNewFile()\
+\{\
+    \cf9 printf\cf0 (\cf4 "\\n===================================="\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\t Creating a new file."\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tPlease enter a file name:"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+    \cf9 scanf\cf0 (\cf4 "%s"\cf0 , \cf10 sequenceFileName\cf0 );\
+    \cf3 FLUSH\cf0 ;\
+    \cf9 strcat\cf0 (\cf10 sequenceFileName\cf0 , \cf4 ".txt"\cf0 );\
+    \
+    \cf10 sequenceFile\cf0  = \cf9 fopen\cf0 (\cf10 sequenceFileName\cf0 , \cf4 "a"\cf0 );\
+    \cf6 if\cf0  (\cf10 sequenceFile\cf0  == \cf6 NULL\cf0 )\
+    \{\
+        \cf9 printf\cf0 (\cf4 "\\n!!!ERROR CREATING %s !!!\\n"\cf0 , \cf10 sequenceFileName\cf0 );\
+    \}\
+    \cf6 else\cf0 \
+    \{\
+        \cf9 fclose\cf0 (\cf10 sequenceFile\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n===================================="\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\nFILE SUCCESSFULLY CREATED"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+\
+        \cf2 //reset sequence counter\cf0 \
+        \cf10 seqCount\cf0  = -\cf5 1\cf0 ;\
+    \}\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++ l o a d F i l e +++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 int\cf0  loadFile()\
+\{\
+    \cf2 //local variable declarations\cf0 \
+    \cf6 int\cf0  errormsg;\
+    \cf6 int\cf0  sequenceNum, noteNum, note, vel, wave;\
+    \
+    \cf9 printf\cf0 (\cf4 "\\n===================================="\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\t Loading a file"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tPlease enter a file name:"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+    \cf9 scanf\cf0 (\cf4 "%s"\cf0 , \cf10 sequenceFileName\cf0 );\
+    \cf3 FLUSH\cf0 ;\
+    \cf9 strcat\cf0 (\cf10 sequenceFileName\cf0 , \cf4 ".txt"\cf0 );\
+    \
+    \cf10 sequenceFile\cf0  = \cf9 fopen\cf0 (\cf10 sequenceFileName\cf0 , \cf4 "r"\cf0 );\
+    \cf6 if\cf0  (\cf10 sequenceFile\cf0  == \cf6 NULL\cf0 )\
+    \{\
+        \cf9 printf\cf0 (\cf4 "\\n!!!ERROR LOADING %s !!!\\n"\cf0 , \cf10 sequenceFileName\cf0 );\
+        errormsg = \cf5 1\cf0 ;\
+    \}\
+    \cf6 else\cf0 \
+    \{\
+        \cf9 printf\cf0 (\cf4 "\\n===================================="\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\nFILE SUCCESSFULLY LOADED"\cf0 );\
+        \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+        \cf10 seqCount\cf0  = -\cf5 1\cf0 ;\
+        \
+        \cf6 while\cf0 (!\cf9 feof\cf0 (\cf10 sequenceFile\cf0 ))\
+        \{\
+            \cf9 fscanf\cf0 (\cf10 sequenceFile\cf0 , \cf4 "Sequence %d: note %d = %d; velocity = %d; wave = %d\\n"\cf0 , &sequenceNum, &noteNum, &note, &vel, &wave);\
+            \
+            \cf6 if\cf0  (sequenceNum > \cf10 seqCount\cf0 )\
+            \{\
+                \cf10 seqCount\cf0  = sequenceNum; \cf2 //update sequence counter\cf0 \
+            \}\
+        \}\
+        \cf9 fclose\cf0 (\cf10 sequenceFile\cf0 );\
+    \}\
+    \
+    \cf6 return\cf0  errormsg;\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++ R E C O R D +++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 void\cf0  record()\
+\{\
+    \cf2 //local variable and array declarations\cf0 \
+    \cf6 int\cf0  seqLEN = \cf5 0\cf0 ;\
+    \cf6 int\cf0  count = \cf5 0\cf0 ;\
+    \cf6 char\cf0  recordAnswer;\
+    \cf10 noteData\cf0  sequenceRecord[\cf5 16\cf0 ][\cf5 300\cf0 ];\
+    \
+    \cf2 //update sequence counter\cf0 \
+    \cf10 seqCount\cf0 ++;\
+    \
+    \cf2 //get seqLEN\cf0 \
+    \cf6 do\cf0 \
+    \{\
+    \cf9 printf\cf0 (\cf4 "\\n=========================================\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tHow many notes in this sequence?\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\nPlease play the longest sequence at last.\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\t\\tPlease enter number\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n=========================================\\n"\cf0 );\
+    \cf9 scanf\cf0 (\cf4 " %d"\cf0 , &seqLEN);\
+    \cf3 FLUSH\cf0 ;\
+    seqLEN = seqLEN * \cf5 2\cf0 ;\
+        \cf6 if\cf0  (seqLEN > \cf5 300\cf0 )\
+        \{\
+            \cf9 printf\cf0 (\cf4 "\\n!!!SEQUENCE TOO LONG!!!\\n"\cf0 );\
+        \}\
+        \cf6 else\cf0  \cf6 if\cf0 (seqLEN < \cf5 2\cf0 )\
+        \{\
+            \cf9 printf\cf0 (\cf4 "\\n...plese enter resonable value...\\n"\cf0 );\
+        \}\
+    \}\cf6 while\cf0 (seqLEN < \cf5 2\cf0  && seqLEN > \cf5 300\cf0 );\
+    \
+        \
+    \
+     \
+    \
+    \cf2 //open the FILE\cf0 \
+    \cf10 sequenceFile\cf0  = \cf9 fopen\cf0 (\cf10 sequenceFileName\cf0 , \cf4 "a"\cf0 );\
+    \cf6 if\cf0  (\cf10 sequenceFile\cf0  == \cf6 NULL\cf0 )\
+    \{\
+        \cf9 printf\cf0 (\cf4 "\\n!!!ERROR OPENING %s !!!\\n"\cf0 , \cf10 sequenceFileName\cf0 );\
+    \}\
+    \cf6 else\cf0 \
+    \{\
+        \cf2 //enable callback\cf0 \
+        \cf10 callBackEnabled\cf0  = \cf5 1\cf0 ;\
+        \
+        \cf2 //ENTER RECORD LOOP\cf0 \
+        \cf6 do\cf0 \
+        \{\
+            \cf2 //print wave form information\cf0 \
+            \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n\\tChoose wave form with the \\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n\\tprogram buttons 1-3. \\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n\\t1: Sinusoid\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n\\t2: Square\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n\\t3: Sawtooth\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n\\tYou can change the wave form\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n\\twhile playing the sequence.\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n====================================\\n"\cf0 );\
+            \
+            \
+            \cf6 for\cf0  (count = \cf5 0\cf0 ; count < seqLEN; count++)                        \cf2 //get sequence data\cf0 \
+            \{\
+                sequenceRecord[\cf10 seqCount\cf0 ][count].\cf10 note\cf0  = \cf8 aserveGetNote\cf0 ();\
+                sequenceRecord[\cf10 seqCount\cf0 ][count].\cf10 velocity\cf0  = \cf8 aserveGetVelocity\cf0 ();\
+                sequenceRecord[\cf10 seqCount\cf0 ][count].\cf10 wave\cf0  = \cf8 aserveGetProgram\cf0 ();\
+            \}\
+            \
+            \cf6 do\cf0                                                               \cf2 //ask for validation\cf0 \
+            \{\
+            \cf9 printf\cf0 (\cf4 "\\n========================================\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\nDo you want to re-record this sequence?\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n\\t\\t\\tY/N\\t\\n"\cf0 );\
+            \cf9 printf\cf0 (\cf4 "\\n========================================\\n"\cf0 );\
+            \cf9 scanf\cf0 (\cf4 " %c"\cf0 , &recordAnswer);\
+            \cf3 FLUSH\cf0 ;\
+            \cf6 if\cf0  (recordAnswer != \cf5 'n'\cf0  && recordAnswer != \cf5 'N'\cf0  && recordAnswer != \cf5 'y'\cf0  && recordAnswer != \cf5 'Y'\cf0 )\
+                \cf9 printf\cf0 (\cf4 "\\nINPUT INVALID\\n"\cf0 );\
+                \
+            \}\cf6 while\cf0 (recordAnswer != \cf5 'n'\cf0  && recordAnswer != \cf5 'N'\cf0  && recordAnswer != \cf5 'y'\cf0  && recordAnswer != \cf5 'Y'\cf0 );\
+            \
+        \}\cf6 while\cf0 (recordAnswer != \cf5 'n'\cf0  && recordAnswer != \cf5 'N'\cf0 );\
+        \
+        \cf2 //WRITING VALIDATED SEQUENCE IN FILE\cf0 \
+        \cf6 for\cf0  (count = \cf5 0\cf0 ; count < seqLEN; count++)\
+        \{\
+        \cf9 fprintf\cf0 (\cf10 sequenceFile\cf0 , \cf4 "Sequence %d: note %d = %d; velocity = %d; wave = %d\\n"\cf0 , \cf10 seqCount\cf0 , count, sequenceRecord[\cf10 seqCount\cf0 ][count].\cf10 note\cf0 , sequenceRecord[\cf10 seqCount\cf0 ][count].\cf10 velocity\cf0 , sequenceRecord[\cf10 seqCount\cf0 ][count].\cf10 wave\cf0 );\
+        \}\
+        \cf9 fclose\cf0 (\cf10 sequenceFile\cf0 );\
+        \
+        \cf2 //disable callback\cf0 \
+        \cf10 callBackEnabled\cf0  = \cf5 0\cf0 ;\
+        \
+    \}\
+    \
+    \
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++ P L A Y B A C K +++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 void\cf0  playback()\
+\{\
+    \cf2 //local variable and array declarations\cf0 \
+    \cf6 int\cf0  sequenceNum, noteNum;\
+    \cf6 int\cf0  note, vel, wave;\
+    \cf6 int\cf0  noteNumCount, sequenceNumCount;\
+    \cf6 int\cf0  playBackLEN = \cf5 0\cf0 ;\
+    \cf6 float\cf0  transpUP, transpDOWN;\
+    \cf6 int\cf0  modWheel = \cf5 0\cf0 , oldMod;\
+    \cf6 float\cf0  volume;\
+    \cf10 noteData\cf0  sequencePlayback[\cf5 16\cf0 ][\cf5 300\cf0 ];\
+    \
+    \
+    \cf2 //print playback instructions\cf0 \
+    \cf8 printInstructions\cf0 ();\
+    \
+    \cf2 //get oldMOD\cf0 \
+    oldMod = \cf8 aserveGetControl\cf0 (\cf5 1\cf0 );\
+    \
+    \cf2 //open loaded FILE\cf0 \
+    \cf10 sequenceFile\cf0  = \cf9 fopen\cf0 (\cf10 sequenceFileName\cf0 , \cf4 "r"\cf0 );\
+    \cf6 if\cf0  (\cf10 sequenceFile\cf0  == \cf6 NULL\cf0 )\
+    \{\
+        \cf9 printf\cf0 (\cf4 "\\n!!!ERROR OPENING %s !!!\\n"\cf0 , \cf10 sequenceFileName\cf0 );\
+    \}\
+    \cf6 else\cf0 \
+    \{\
+        \cf2 //INITIALISING THE 2D-ARRAY\cf0 \
+        \cf6 while\cf0 (!\cf9 feof\cf0 (\cf10 sequenceFile\cf0 ))\
+        \{\
+            \cf9 fscanf\cf0 (\cf10 sequenceFile\cf0 , \cf4 "Sequence %d: note %d = %d; velocity = %d; wave = %d\\n"\cf0 , &sequenceNum, &noteNum, &note, &vel, &wave);\
+            \
+            \cf6 if\cf0  (noteNum > playBackLEN)\
+                playBackLEN = noteNum;\
+            \
+            sequencePlayback[sequenceNum][noteNum].\cf10 note\cf0  = note;\
+            sequencePlayback[sequenceNum][noteNum].\cf10 velocity\cf0  = vel;\
+            sequencePlayback[sequenceNum][noteNum].\cf10 wave\cf0  = wave;\
+            \
+            \
+        \}\
+        \cf9 fclose\cf0 (\cf10 sequenceFile\cf0 );\
+        \
+        \cf2 //enable callback\cf0 \
+        \cf10 callBackEnabled\cf0  = \cf5 1\cf0 ;\
+        \
+        \cf2 //PLAYBACK\cf0 \
+        \cf6 while\cf0 (modWheel == \cf5 0\cf0 )\
+        \{\
+            \cf6 for\cf0  (noteNumCount = \cf5 0\cf0 ; noteNumCount <= playBackLEN; noteNumCount++)         \cf2 //Outer loop (notes)\cf0 \
+            \{\
+                \cf6 for\cf0  (sequenceNumCount = \cf5 0\cf0 ; sequenceNumCount <= \cf10 seqCount\cf0 ; sequenceNumCount++) \cf2 //Inner loop (oscillators)\cf0 \
+                \{\
+                    \cf6 if\cf0  (sequencePlayback[sequenceNumCount][noteNumCount].\cf10 velocity\cf0  > \cf5 0\cf0 )\
+                    \{\
+                        \cf2 //get Transposition value\cf0 \
+                        transpUP = \cf8 aserveGetControl\cf0 (\cf5 75\cf0 )/\cf3 TRANSPconst\cf0 ;\
+                        transpDOWN = \cf8 aserveGetControl\cf0 (\cf5 10\cf0 )/\cf3 TRANSPconst\cf0 ;\
+                        \
+                        \cf2 //get volume control\cf0 \
+                        \cf8 getVolumeControl\cf0 ();\
+                        \
+                        \cf2 //calculate volume\cf0 \
+                        \cf6 if\cf0 (sequenceNumCount > \cf5 7\cf0 )\
+                        \{\
+                            volume = (sequencePlayback[sequenceNumCount][noteNumCount].\cf10 velocity\cf0 /\cf3 velocityDivisor\cf0 ) * (\cf10 ampLayer2\cf0 [sequenceNumCount]/\cf3 velocityDivisor\cf0 );\
+                        \}\
+                        \cf6 else\cf0 \
+                        \{\
+                            volume = (sequencePlayback[sequenceNumCount][noteNumCount].\cf10 velocity\cf0 /\cf3 velocityDivisor\cf0 ) * (\cf10 ampLayer1\cf0 [sequenceNumCount]/\cf3 velocityDivisor\cf0 );\
+                        \}\
+                        \cf2 //Start oscillator\cf0 \
+                        \cf8 aserveOscillator\cf0 (sequenceNumCount, \cf8 mtof\cf0 (sequencePlayback[sequenceNumCount][noteNumCount].\cf10 note\cf0  + transpUP - transpDOWN), volume, sequencePlayback[sequenceNumCount][noteNumCount].\cf10 wave\cf0 );\
+                        \
+                        \
+                        \cf6 if\cf0  (sequenceNumCount == \cf10 seqCount\cf0 )\
+                            \cf8 aserveSleep\cf0 ((\cf8 aserveGetControl\cf0 (\cf5 7\cf0 ) * \cf5 7.48031496\cf0 )+ \cf5 50\cf0 );\
+                        \
+                    \}\
+                    \cf6 else\cf0  \cf6 if\cf0  (sequencePlayback[sequenceNumCount][noteNumCount].\cf10 velocity\cf0  == \cf5 0\cf0 )\
+                    \{\
+                        \
+                            \cf8 aserveOscillator\cf0 (sequenceNumCount, \cf5 0\cf0 , \cf5 0\cf0 , \cf5 0\cf0 );\
+                    \}\
+                \}\
+                \
+            \}\
+            \
+            modWheel = \cf8 aserveGetControl\cf0 (\cf5 1\cf0 );\
+            \cf6 if\cf0 (oldMod == modWheel)\
+                modWheel = \cf5 0\cf0 ;\
+        \}\
+        \cf2 //stop all oscillators\cf0 \
+        \cf8 stopOscillator\cf0 ();\
+        \
+        \cf2 //disable callback\cf0 \
+        \cf10 callBackEnabled\cf0  = \cf5 0\cf0 ;\
+    \}\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++ M T O F +++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 float\cf0  mtof(\cf6 float\cf0  note)\
+\{\
+    \cf6 return\cf0  \cf5 440.0\cf0  * \cf9 pow\cf0 (\cf5 2\cf0 , (note - \cf5 69.0\cf0 )/\cf5 12.0\cf0 );\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //+++++++++++++++++++++++ s t o p O s c i l l a t o r ++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 void\cf0  stopOscillator()\
+\{\
+    \cf6 for\cf0  (\cf6 int\cf0  counter = \cf5 0\cf0 ; counter < \cf5 16\cf0 ; counter++)\
+    \{\
+        \cf8 aserveOscillator\cf0 (counter, \cf5 0\cf0 , \cf5 0\cf0 , \cf5 0\cf0 );\
+    \}\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //+++++++++++++++++++++++++++ m i d i C a l l b a c k ++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 void\cf0  midiCallBack(\cf6 int\cf0  status, \cf6 int\cf0  data1, \cf6 int\cf0  data2)\
+\{\
+    \cf2 //local variable decleration\cf0 \
+    \cf6 int\cf0  msgtype = status >> \cf5 4\cf0 ;\
+    \cf6 int\cf0  waveForm = \cf5 0\cf0 ;\
+    \
+    \cf2 //static variables\cf0 \
+    \cf6 static\cf0  \cf6 int\cf0  playingnote = -\cf5 1\cf0 ;\
+    \cf6 static\cf0  \cf6 int\cf0  velocity = \cf5 0\cf0 ;\
+    \
+    \cf6 if\cf0 (\cf10 callBackEnabled\cf0  == \cf5 1\cf0 )\
+    \{\
+        \cf6 if\cf0  (msgtype == \cf5 9\cf0 )\
+        \{\
+            waveForm = \cf8 aserveGetProgram\cf0 ();\
+            \
+            \cf6 if\cf0  (data2 != \cf5 0\cf0 )\
+            \{\
+                playingnote = data1;\
+                velocity = data2;\
+            \}\
+            \cf6 else\cf0  \cf6 if\cf0  (data2 == \cf5 0\cf0  && data1 == playingnote)\
+            \{\
+                    \cf8 aserveOscillator\cf0 (\cf5 15\cf0 , \cf5 0\cf0 , \cf5 0\cf0 , \cf5 0\cf0 );\
+                    playingnote = -\cf5 1\cf0 ;\
+                    velocity = data2;\
+            \}\
+        \}\
+        \
+        \cf6 if\cf0  (playingnote != -\cf5 1\cf0 )\
+        \{\
+            \cf8 aserveOscillator\cf0 (\cf5 15\cf0 , \cf8 mtof\cf0 (playingnote), velocity/\cf5 127.0\cf0 , waveForm);\
+        \}\
+    \}\
+    \
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //+++++++++++++++++++++++ p r i n t I n s t r u c t i o n s ++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 void\cf0  printInstructions()\
+\{\
+    \cf9 printf\cf0 (\cf4 "\\n=======================================\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\t\\tPLAYBACK CONTROL\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\t\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tTempo:\\t\\t\\tSlider D17 \\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tTranspose up:\\t\\tDial B5\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tTranspose down:\\tDial B1\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tMix with the Sliders D9 - D16\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tprogram 8 for sequence 1 - 8\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tprogram 9 for sequence 9 - 16\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\t!play with your track!\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n\\tMove mod wheel to STOP\\n"\cf0 );\
+    \cf9 printf\cf0 (\cf4 "\\n=======================================\\n"\cf0 );\
+\}\
+\
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //+++++++++++++++++++++++ g e t V o l u m e C o n t r o l ++++++++++++++++++++++++++++++++\cf0 \
+\cf2 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\cf0 \
+\cf6 void\cf0  getVolumeControl()\
+\{\
+    \cf6 int\cf0  layer;\
+    \
+    layer = \cf8 aserveGetProgram\cf0 ();\
+    \
+    \cf6 switch\cf0  (layer)\
+    \{\
+        \cf6 case\cf0  \cf5 7\cf0 :\
+            \cf10 ampLayer1\cf0 [\cf5 0\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 74\cf0 );\
+            \cf10 ampLayer1\cf0 [\cf5 1\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 71\cf0 );\
+            \cf10 ampLayer1\cf0 [\cf5 2\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 91\cf0 );\
+            \cf10 ampLayer1\cf0 [\cf5 3\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 93\cf0 );\
+            \cf10 ampLayer1\cf0 [\cf5 4\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 73\cf0 );\
+            \cf10 ampLayer1\cf0 [\cf5 5\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 72\cf0 );\
+            \cf10 ampLayer1\cf0 [\cf5 6\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 5\cf0 );\
+            \cf10 ampLayer1\cf0 [\cf5 7\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 84\cf0 );\
+            \cf6 break\cf0 ;\
+            \
+        \cf6 case\cf0  \cf5 8\cf0 :\
+            \cf10 ampLayer2\cf0 [\cf5 0\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 74\cf0 );\
+            \cf10 ampLayer2\cf0 [\cf5 1\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 71\cf0 );\
+            \cf10 ampLayer2\cf0 [\cf5 2\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 91\cf0 );\
+            \cf10 ampLayer2\cf0 [\cf5 3\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 93\cf0 );\
+            \cf10 ampLayer2\cf0 [\cf5 4\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 73\cf0 );\
+            \cf10 ampLayer2\cf0 [\cf5 5\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 72\cf0 );\
+            \cf10 ampLayer2\cf0 [\cf5 6\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 5\cf0 );\
+            \cf10 ampLayer2\cf0 [\cf5 7\cf0 ] = \cf8 aserveGetControl\cf0 (\cf5 84\cf0 );\
+            \cf6 break\cf0 ;\
+            \
+        \cf6 default\cf0 :\
+            \cf6 break\cf0 ;\
+    \}\
+\}\
+}
